@@ -1,0 +1,345 @@
+# Carregando pacotes e bibliotecas necessárias
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+import smtplib
+from email.mime.base import MIMEBase
+from email import encoders
+import os
+import pandas as pd
+from reportlab.pdfgen import canvas
+import gspread
+from google.oauth2.service_account import Credentials
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+import time
+from datetime import datetime, timedelta
+from reportlab.lib.pagesizes import A4
+from PIL import Image
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
+import traceback
+import schedule
+
+
+
+
+
+def quebrar_texto(c, texto, max_width):
+    words = texto.split()
+    lines = []
+    current_line = ""
+    for word in words:
+        if stringWidth(current_line + " " + word, "Helvetica", 12) <= max_width:
+            current_line += " " + word if current_line else word
+        else:
+            lines.append(current_line)
+            current_line = word
+    if current_line:
+        lines.append(current_line)
+    return lines
+
+
+# Criando os arquivos em PDF
+def cria_PDFLinha1(i, df_pse):
+
+    pdf_Linha1 = f"Quadro_de_Referência_Provisória_{i}.pdf"
+    c = canvas.Canvas(pdf_Linha1, pagesize=A4)
+    imagem_path = "Inserir endereço da imagem"
+    pos_x = 50 // Calcular a propoção
+    pos_y = 765
+    largura = 138
+    altura = 29.6
+    imagem = ImageReader(imagem_path)
+    c.drawImage(imagem, pos_x, pos_y, width=largura, height=altura)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+        100, 782, "                                   Quadro de Referência Provisória"
+    )
+    margemx = 20
+    largura_caixax = 490
+    altura_caixax = 140
+    c.rect(60, 615 - margemx, largura_caixax, altura_caixax)
+    c.drawString(70, 762, "                                                       Informações gerais")
+    c.drawString(70, 720, "Código do QRP:")    
+    c.setFont("Helvetica", 12)
+    c.drawString(170, 720, f"{df_pse.iloc[i, 2]}")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(70, 700, "Registro de emissão:")
+    c.setFont("Helvetica", 12)
+    c.drawString(200, 700, f"{df_pse.iloc[i, 0]}")
+    c.setFont("Helvetica-Bold", 12)  
+    c.drawString(70, 680, "Gerência Emissora:")
+    c.setFont("Helvetica", 12)
+    c.drawString(190, 680, f"{df_pse.iloc[i, 450]}")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(70, 660, "Contato:")
+    c.setFont("Helvetica", 12)
+    c.drawString(123, 660, f"{df_pse.iloc[i, 451]}")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(70, 640, "Destinatário:")
+    c.setFont("Helvetica", 12)
+    destinatario_empresa = f"{df_pse.iloc[i, 3]}"
+    max_width = 350
+    lines = quebrar_texto(c, destinatario_empresa, max_width)
+    pos_y = 640
+    for line in lines:
+        c.drawString(150, pos_y, line)
+        pos_y -= 15
+
+    margem = 20
+    largura_caixa = 490
+    altura_caixa = 80
+
+    c.rect(60, 530 - margem, largura_caixa, altura_caixa)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(70, 570, "Referência:")
+    c.setFont("Helvetica", 12)
+    texto_referencia = f"{df_pse.iloc[i, 4]}"
+    max_width = 500
+    lines = quebrar_texto(c, texto_referencia, max_width)
+    pos_y = 570
+    for line in lines:
+        c.drawString(140, pos_y, line)
+        pos_y -= 15
+
+    margem2 = 20
+    largura_caixa2 = 490
+    altura_caixa2 = 50
+    c.rect(60, 475 - margem2, largura_caixa2, altura_caixa2)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+        70, 490, "Vigência - Data Inicial:"
+    )  
+    c.setFont("Helvetica", 12)
+    c.drawString(
+        201, 490, f"{df_pse.iloc[i, 6]}"
+    )
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+        300, 490, "Vigência - Horário Inicial:"
+    )
+    c.setFont("Helvetica", 12)
+    c.drawString(
+        450, 490, f"{df_pse.iloc[i, 7]}"
+    ) 
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+        70, 465, "Vigência - Data Final:"
+    )
+    c.setFont("Helvetica", 12)
+    c.drawString(
+        201, 465, f"{df_pse.iloc[i, 8]}"
+    ) 
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+        300, 465, "Vigência - Horário Final:"
+    )
+    c.setFont("Helvetica", 12)
+    c.drawString(
+        450, 465, f"{df_pse.iloc[i, 9]}"
+    )  
+
+    margem3 = 20
+    largura_caixa3 = 490
+    altura_caixa3 = 320
+    c.rect(60, 149   - margem3, largura_caixa3, altura_caixa3)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(70, 427, "Descrição:")
+    c.setFont("Helvetica", 12)
+    texto_descricao = f"{df_pse.iloc[i, 5]}"
+    max_width = 400
+    lines = quebrar_texto(c, texto_descricao, max_width)
+    pos_y = 427
+    for line in lines:
+        c.drawString(140, pos_y, line)
+        pos_y -= 15
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(
+    100,
+    80,
+    f"                                                Gerência - BT/SM",
+)
+
+
+    c.showPage()
+
+
+
+
+
+
+
+    for j in range(10, len(df_pse.columns), 9):
+        if (df_pse.iloc[i, j - 1] == "Sim") or (j == 10):
+            imagem_path = "Inserir endereço da imagem"
+            pos_x = 50
+            pos_y = 765
+            largura = 138
+            altura = 29.6
+            imagem = ImageReader(imagem_path)
+            c.drawImage(imagem, pos_x, pos_y, width=largura, height=altura)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(
+                100,
+                782,
+                "                                   Quadro de Referência Provisória",
+            )
+
+            c.drawString(70, 762, f"                                                       Descrição do QRP")
+            margem8 = 20
+            largura_caixa8 = 490
+            altura_caixa8 = 50
+            c.rect(60, 710   - margem8, largura_caixa8, altura_caixa8)
+
+            c.drawString(70, 720, "Linha - PC:")
+            c.setFont("Helvetica", 12)
+            c.drawString(140, 720, f"{df_pse.iloc[i,j]}")
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(70, 700, "Extensão QRO(em metros):")            
+            c.setFont("Helvetica", 12)
+            c.drawString(230, 700, f"{df_pse.iloc[i,j+3]}")
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(330, 700, "Extensão QRP(em metros):")            
+            c.setFont("Helvetica", 12)
+            c.drawString(491, 700, f"{df_pse.iloc[i,j+4]}") 
+            margem5 = 20
+            largura_caixa5 = 490
+            altura_caixa5 = 190
+            c.rect(60, 515  - margem5, largura_caixa5, altura_caixa5)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(70, 670, "Alterações no itinerário:")
+            c.setFont("Helvetica", 12)    
+            texto_itinerario = f"{df_pse.iloc[i,j+2]}"
+            max_width = 420
+            lines = quebrar_texto(c, texto_itinerario, max_width)
+            pos_y = 650
+            for line in lines:
+                c.drawString(70, pos_y, line)
+                pos_y -= 15
+
+            margem5 = 20
+            largura_caixa5 = 490
+            altura_caixa5 = 130
+            c.rect(60, 382   - margem5, largura_caixa5, altura_caixa5)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(70, 472, "Alterações no quadro de horário:")
+            c.setFont("Helvetica", 12)    
+            texto_qh = f"{df_pse.iloc[i, j+5]}"
+            max_width = 450
+            lines = quebrar_texto(c, texto_qh, max_width)
+            pos_y = 455
+            for line in lines:
+                c.drawString(70, pos_y, line)
+                pos_y -= 15
+
+
+
+            margem6 = 20
+            largura_caixa6 = 490
+            altura_caixa6 = 135
+            c.rect(60, 242.2   - margem6, largura_caixa6, altura_caixa6)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(70, 340.2, "Alterações nos pontos de embarque e desembrque:")
+            c.setFont("Helvetica", 12)
+            texto_ped = f"{df_pse.iloc[i, j+6]}"
+            max_width = 450
+            lines = quebrar_texto(c, texto_ped, max_width)
+            pos_y = 325
+            for line in lines:
+                c.drawString(70, pos_y, line)
+                pos_y -= 15
+            margem7 = 20
+            largura_caixa7 = 490
+            altura_caixa7 = 135
+            c.rect(60, 103   - margem7, largura_caixa7, altura_caixa7)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(70, 203, "Observações:")
+            c.setFont("Helvetica", 12)            
+            obs = f"{df_pse.iloc[i, j+7]}"
+            max_width = 450
+            lines = quebrar_texto(c, obs, max_width)
+            pos_y = 190
+            for line in lines:
+                c.drawString(70, pos_y, line)
+                pos_y -= 15
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(80,
+                  40,
+    f"                                               Gerência - BT/SM")
+
+
+            c.showPage()
+
+    c.save()
+
+    return pdf_Linha1
+
+def tarefa():
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        gc = gspread.service_account(filename="API Google JSON")
+        pse_arquivo = gc.open_by_key("Google Sheets Key")
+        worksheet = pse_arquivo.worksheet("Respostas ao formulário 1")
+        pse_plan = worksheet.get_all_values()
+
+        df_pse = pd.DataFrame(pse_plan)
+        print(df_pse)
+        def enviar_email(subject, to, body, files):
+                print(f"Enviando PDF {files}")
+                msg = MIMEMultipart()
+                msg["Subject"] = subject
+                msg["From"] = "email"
+                msg["To"] = ", ".join(to)
+                password = "senha"
+                msg.attach(MIMEText(body, "html"))
+
+                with open(files, "rb") as fil:
+                    part = MIMEApplication(fil.read(), Name=os.path.basename(files))
+                part["Content-Disposition"] = 'attachment; filename="%s"' % os.path.basename(files)
+                msg.attach(part)
+
+                s = smtplib.SMTP("smtp.gmail.com:587")
+                s.starttls()
+                s.login(msg["From"], password)
+                s.sendmail(msg["From"], [msg["To"]], msg.as_string().encode("utf-8"))
+                print("Email enviado")
+
+        assinatura = """
+                   """
+        mensagem = f"""<p>Prezado (a)</p>
+                    <p> Segue o PDF gerado do QRP cadastrado.</p>
+                            <p>Atenciosamente,</p>:
+                            <p> {assinatura}.</p>
+            """
+        data_formatada = None
+
+            # ... (código anterior) ...
+
+        num_linhas = len(df_pse)
+
+        for i in range(num_linhas):
+                carimbo = df_pse.iloc[i, 0]
+                destinatarios = df_pse.iloc[i, 452]  
+                data_formatada = pd.to_datetime(
+                    carimbo, format="%d/%m/%Y %H:%M:%S", errors="coerce"
+                )
+                now = datetime.now()
+
+                diferencaminuto = (now - data_formatada).total_seconds() / 60
+                print(now)
+
+                if diferencaminuto <= 5:
+                    for destinatario in destinatarios.split(
+                        ";"
+                    ):  
+                        print(destinatario.strip())
+                        # pdf = cria_PDFLinha1(i, df_pse)
+                        enviar_email(
+                            "QRP", [destinatario.strip()], mensagem, cria_PDFLinha1(i, df_pse)
+                        ) 
+
+schedule.every(5).minutes.do(tarefa)
+tarefa()
+while True:
+    schedule.run_pending()
+    time.sleep(1)
